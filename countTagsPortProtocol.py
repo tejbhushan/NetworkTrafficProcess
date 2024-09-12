@@ -1,5 +1,6 @@
 import csv
 from collections import defaultdict
+import argparse
 
 # Function to load the tag lookup table from a CSV file
 def load_tag_lookup_table(lookup_file):
@@ -28,26 +29,29 @@ def parse_flow_logs(log_file, tag_lookup):
 
     with open(log_file, 'r') as file:
         for line in file:
-            components = line.strip().split()
+            try:
+                components = line.strip().split()
 
-            if not components:
-                continue
+                if not components:
+                    continue
 
-            # Extract dstport (7th column) and protocol (8th column)
-            dstport = components[6]
-            protocol_num = components[7]
-            
-            protocol = "unknown"
-            if protocol_num in protocol_map:
-                protocol = protocol_map[protocol_num]
-            
-            tag = tag_lookup.get((dstport, protocol), "Untagged")
-            if (dstport, protocol) in tag_lookup:
-                tag_counts[tag] += 1
-            else:
-                untagged_count += 1
+                # Extract dstport (7th column) and protocol (8th column)
+                dstport = components[6]
+                protocol_num = components[7]
+                
+                protocol = "unknown"
+                if protocol_num in protocol_map:
+                    protocol = protocol_map[protocol_num]
+                
+                tag = tag_lookup.get((dstport, protocol), "Untagged")
+                if (dstport, protocol) in tag_lookup:
+                    tag_counts[tag] += 1
+                else:
+                    untagged_count += 1
 
-            port_protocol_counts[(dstport, protocol)] += 1
+                port_protocol_counts[(dstport, protocol)] += 1
+            except Exception as e:
+                print(f" log line skipped - {line} due to error {e}")
 
     return tag_counts, port_protocol_counts, untagged_count
 
@@ -65,10 +69,18 @@ def write_output(output_file, tag_counts, port_protocol_counts, untagged_count):
         for (port, protocol), count in port_protocol_counts.items():
             file.write(f"{port},{protocol},{count}\n")
 
+def parse_arguments():
+    parser = argparse.ArgumentParser(description="Parse flow logs and apply tags based on a lookup table.")
+    parser.add_argument('--log_file', required=True, help="Path to the flow log file.")
+    parser.add_argument('--lookup_file', required=True, help="Path to the CSV lookup table file.")
+    args = parser.parse_args()
+    return args
+
 # Main function to execute the script
 def main():
-    log_file = 'flow_logs.txt'
-    lookup_file = 'tag_lookup_table.csv'
+    args = parse_arguments()
+    log_file = args.log_file
+    lookup_file = args.lookup_file
     output_file = 'output.csv'
 
     try:
